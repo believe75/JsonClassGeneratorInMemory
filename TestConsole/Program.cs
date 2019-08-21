@@ -12,6 +12,7 @@ namespace TestConsole
         {
             var test = new ClassGenerator.ClassGenerator();
             test.ClassName = "TestProcess";
+            test.JsonData = "";
             var t = test.Generate();
 
 

@@ -27,21 +27,15 @@ namespace ClassGenerator
         public List<dynamic> Generate()
         {
             /* Assambly Process Start */
-            if (DynamicType.asmBuilder == null) DynamicType.GenerateAssemblyAndModule();
+           DynamicType.GenerateAssemblyAndModule();
 
             List<Type> listType = new List<Type>();
 
             TypeBuilder tb = DynamicType.CreateType(DynamicType.modBuilder, ClassName);
             /* Assambly Process Finish */
 
-
-
-            JsonData = File.ReadAllText(@"D:\ContractFill-5115.json"); ;
-
             var dynamicObject = JsonConvert.DeserializeObject<JObject>(JsonData);
             var listDynamicObject = dynamicObject.Properties();
-
-
 
             listType = DynamicType.CreateClassProperties("master", listDynamicObject, tb, listType);
             /* Propery create Finish */
@@ -71,8 +65,8 @@ namespace ClassGenerator
             public static ModuleBuilder modBuilder = null;
             public static void GenerateAssemblyAndModule()
             {
-                if (asmBuilder == null)
-                {
+                //if (asmBuilder == null)
+                //{
                     AssemblyName assemblyName = new AssemblyName();
                     assemblyName.Name = "MyAssembly";
                     AppDomain thisDomain = Thread.GetDomain();
@@ -80,7 +74,7 @@ namespace ClassGenerator
                                  assemblyName, AssemblyBuilderAccess.Run);
                     modBuilder = asmBuilder.DefineDynamicModule(
                                  asmBuilder.GetName().Name, false);
-                }
+                //}
             }
 
             public static TypeBuilder CreateType(ModuleBuilder modBuilder, string typeName)
