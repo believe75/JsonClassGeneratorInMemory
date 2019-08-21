@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.VisualBasic.CompilerServices;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
@@ -27,7 +28,9 @@ namespace ClassGenerator
         {
             /* Assambly Process Start */
             if (DynamicType.asmBuilder == null) DynamicType.GenerateAssemblyAndModule();
-            var finalType = DynamicType.modBuilder.GetType(ClassName);
+
+            List<Type> listType = new List<Type>();
+
             TypeBuilder tb = DynamicType.CreateType(DynamicType.modBuilder, ClassName);
             /* Assambly Process Finish */
 
@@ -40,26 +43,19 @@ namespace ClassGenerator
 
 
 
-            DynamicType.CreateClassProperties(listDynamicObject, tb, out finalType);
-            finalType = tb.CreateType();
+            listType = DynamicType.CreateClassProperties("master", listDynamicObject, tb, listType);
             /* Propery create Finish */
 
 
+            List<dynamic> listObj = new List<dynamic>();
 
-            Object obj = Activator.CreateInstance(finalType);
-
+            foreach (var itemType in listType)
+            {
+                listObj.Add(Activator.CreateInstance(itemType));
+            }
 
             /* Propery set value Start */
-            obj = DynamicType.PropertySetValue(listDynamicObject, finalType, obj);
-            //foreach (var e in listDynamicObject)
-            //{
-            //    if (e.Value.Count() == 0)
-            //    {
-            //        string pname = e.Name;
-            //        object value = e.Value.ToString();
-            //        finalType.InvokeMember(pname, BindingFlags.SetProperty, null, obj, new object[] { value });
-            //    }
-            //}
+            var obj = DynamicType.PropertySetValue(listType.LastOrDefault().Name, listDynamicObject, listType, listObj);
             /* Propery set value Finish */
 
             return new List<dynamic>() { obj };
@@ -130,7 +126,7 @@ namespace ClassGenerator
             }
 
 
-            public static void CreateClassProperties(IEnumerable<JProperty> properties, TypeBuilder typeBuilder, out Type type)
+            public static List<Type> CreateClassProperties(string moduleName, IEnumerable<JProperty> properties, TypeBuilder typeBuilder, List<Type> listType)
             {
 
                 foreach (var e in properties)
@@ -145,19 +141,24 @@ namespace ClassGenerator
                     else
                     {
                         TypeBuilder tbParent = DynamicType.CreateType(DynamicType.modBuilder, pname);
-
-                        CreateClassProperties(e.Value.Children<JProperty>(), tbParent, out type);
-
-                        DynamicType.CreateProperty(typeBuilder, pname, tbParent.GetType());
+                        listType = CreateClassProperties(moduleName + e.Name, e.Value.Children<JProperty>(), tbParent, listType);
+                        DynamicType.CreateProperty(typeBuilder, pname, tbParent.AsType());
                     }
 
                 }
 
-                type = typeBuilder.CreateType();
+                var finalType = DynamicType.modBuilder.GetType(moduleName);
+                finalType = typeBuilder.CreateType();
+                listType.Add(finalType);
+
+                return listType;
             }
 
-            public static object PropertySetValue(IEnumerable<JProperty> properties, Type finalType, object obj)
+            public static object PropertySetValue(string typeName, IEnumerable<JProperty> properties, List<Type> listType, List<dynamic> listObj)
             {
+                var finalType = listType.FirstOrDefault(t => t.Name == typeName);
+                var obj = listObj.FirstOrDefault(t => t.GetType().Name == typeName);
+
                 foreach (var e in properties)
                 {
                     if (e.Value.Count() == 0)
@@ -168,8 +169,10 @@ namespace ClassGenerator
                     }
                     else
                     {
-                        //var typer = finalType.GetProperty(e.Name).PropertyType;
-                        //obj = PropertySetValue(e.Value.Children<JProperty>(), typer, obj);
+                        var childObject = PropertySetValue(e.Name, e.Value.Children<JProperty>(), listType, listObj);
+
+                        finalType.InvokeMember(e.Name, BindingFlags.SetProperty, null, obj, new object[] { childObject });
+
                     }
                 }
 
