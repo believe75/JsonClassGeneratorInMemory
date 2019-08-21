@@ -1,11 +1,17 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Dynamic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+
 
 namespace ClassGenerator
 {
@@ -13,131 +19,53 @@ namespace ClassGenerator
     {
         public string ClassName { get; set; }
 
-        public Dictionary<string,string> Properties { get; set; }
+        public string JsonData { get; set; }
 
 
 
-        public string Generate()
+        public List<dynamic> Generate()
         {
-            string a = "";
-
-            var dataa = a.GetType().FullName;
-
-
-            Properties = new Dictionary<string, string>();
-            Properties.Add("test", "işlem");
-            Properties.Add("test2", "işlem2");
-            Properties.Add("test3", "işlem3");
+            /* Assambly Process Start */
+            if (DynamicType.asmBuilder == null) DynamicType.GenerateAssemblyAndModule();
+            var finalType = DynamicType.modBuilder.GetType(ClassName);
+            TypeBuilder tb = DynamicType.CreateType(DynamicType.modBuilder, ClassName);
+            /* Assambly Process Finish */
 
 
 
-            if (DynamicType.asmBuilder == null)
-                DynamicType.GenerateAssemblyAndModule();
+            JsonData = File.ReadAllText(@"D:\ContractFill-5115.json"); ;
+
+            var dynamicObject = JsonConvert.DeserializeObject<JObject>(JsonData);
+            var listDynamicObject = dynamicObject.Properties();
 
 
-            var finalType = DynamicType.modBuilder.GetType("Beacon11");
 
-            TypeBuilder tb = DynamicType.CreateType(DynamicType.modBuilder, "ClassName");
-
-            foreach (var e in Properties)
-            {
-                string pname = e.Key;
-                string ptype = "System.String";
-                DynamicType.CreateProperty(tb, pname, Type.GetType(ptype));
-            }
+            DynamicType.CreateClassProperties(listDynamicObject, tb, out finalType);
             finalType = tb.CreateType();
+            /* Propery create Finish */
+
+
 
             Object obj = Activator.CreateInstance(finalType);
-            // this sets the properties of the just instantiated class
-            //finalType.InvokeMember("bv", BindingFlags.SetProperty, null, data, new object[] { 1.0 });
-            //finalType.InvokeMember("tp", BindingFlags.SetProperty, null, data, new object[] { 2.0 });
-            //this sets the properties of the type by using values from the querystring
 
 
+            /* Propery set value Start */
+            obj = DynamicType.PropertySetValue(listDynamicObject, finalType, obj);
+            //foreach (var e in listDynamicObject)
+            //{
+            //    if (e.Value.Count() == 0)
+            //    {
+            //        string pname = e.Name;
+            //        object value = e.Value.ToString();
+            //        finalType.InvokeMember(pname, BindingFlags.SetProperty, null, obj, new object[] { value });
+            //    }
+            //}
+            /* Propery set value Finish */
 
-
-            foreach (var e in Properties)
-            {
-                string pname = e.Key;
-                object value = e.Value;
-                finalType.InvokeMember(pname, BindingFlags.SetProperty, null, obj, new object[] { value });
-            }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            // Create a Type Builder that generates a type directly into the current AppDomain.
-            var appDomain = AppDomain.CurrentDomain;
-            var assemblyName = new AssemblyName("MyDynamicAssembly");
-            var assemblyBuilder = appDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
-            var moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name);
-
-            var typeBuilder = moduleBuilder.DefineType("MyDynamicType", TypeAttributes.Class | TypeAttributes.Public);
-
-            var propertyName = "Name";
-
-            // Generate a property called &quot;Name&quot;
-
-            var propertyType = typeof(string);
-            var propertyBuilder = typeBuilder.DefineProperty(propertyName, PropertyAttributes.HasDefault, propertyType, null);
-
-            // Generate getter method
-
-            var getter = typeBuilder.DefineMethod("Name", MethodAttributes.Public, propertyType, Type.EmptyTypes);
-
-            var il = getter.GetILGenerator();
-
-            il.Emit(OpCodes.Ldarg_0);        // Push &quot;this&quot; on the stack
-            il.Emit(OpCodes.Ret);            // Return
-
-            propertyBuilder.SetGetMethod(getter);
-
-            // Generate setter method
-
-            var setter = typeBuilder.DefineMethod("Name", MethodAttributes.Public, null, new[] { propertyType });
-
-            il = setter.GetILGenerator();
-
-            il.Emit(OpCodes.Ldarg_0);        // Push &quot;this&quot; on the stack
-            il.Emit(OpCodes.Ldarg_1);        // Push &quot;value&quot; on the stack
-            il.Emit(OpCodes.Ret);            // Return
-
-            propertyBuilder.SetSetMethod(setter);
-
-            var t2 = assemblyBuilder.CodeBase;
-            assemblyBuilder.Save("MyDynamicAssembly.dll");
-
-
-
-            return "";
+            return new List<dynamic>() { obj };
         }
+
+
 
 
         public class DynamicType
@@ -150,7 +78,7 @@ namespace ClassGenerator
                 if (asmBuilder == null)
                 {
                     AssemblyName assemblyName = new AssemblyName();
-                    assemblyName.Name = "DWBeacons";
+                    assemblyName.Name = "MyAssembly";
                     AppDomain thisDomain = Thread.GetDomain();
                     asmBuilder = thisDomain.DefineDynamicAssembly(
                                  assemblyName, AssemblyBuilderAccess.Run);
@@ -201,6 +129,55 @@ namespace ClassGenerator
 
             }
 
+
+            public static void CreateClassProperties(IEnumerable<JProperty> properties, TypeBuilder typeBuilder, out Type type)
+            {
+
+                foreach (var e in properties)
+                {
+                    string pname = e.Name;
+
+                    if (e.Value.Count() == 0)
+                    {
+                        string ptype = "System.String";
+                        DynamicType.CreateProperty(typeBuilder, pname, Type.GetType(ptype));
+                    }
+                    else
+                    {
+                        TypeBuilder tbParent = DynamicType.CreateType(DynamicType.modBuilder, pname);
+
+                        CreateClassProperties(e.Value.Children<JProperty>(), tbParent, out type);
+
+                        DynamicType.CreateProperty(typeBuilder, pname, tbParent.GetType());
+                    }
+
+                }
+
+                type = typeBuilder.CreateType();
+            }
+
+            public static object PropertySetValue(IEnumerable<JProperty> properties, Type finalType, object obj)
+            {
+                foreach (var e in properties)
+                {
+                    if (e.Value.Count() == 0)
+                    {
+                        string pname = e.Name;
+                        object value = e.Value.ToString();
+                        finalType.InvokeMember(pname, BindingFlags.SetProperty, null, obj, new object[] { value });
+                    }
+                    else
+                    {
+                        //var typer = finalType.GetProperty(e.Name).PropertyType;
+                        //obj = PropertySetValue(e.Value.Children<JProperty>(), typer, obj);
+                    }
+                }
+
+                return obj;
+            }
+
         }
     }
+
+
 }

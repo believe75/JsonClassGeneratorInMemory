@@ -12,7 +12,7 @@ namespace TestConsole
         {
             var test = new ClassGenerator.ClassGenerator();
             test.ClassName = "TestProcess";
-            test.Generate();
+            var t = test.Generate();
 
 
         }
